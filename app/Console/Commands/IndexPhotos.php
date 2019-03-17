@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
+use Carbon\Carbon;
 use Google_Client;
-use Google_Service_PhotosLibrary;
+use App\Models\Album;
 use Illuminate\Console\Command;
+use Google_Service_PhotosLibrary;
 
 class IndexPhotos extends Command
 {
@@ -13,7 +15,7 @@ class IndexPhotos extends Command
      *
      * @var string
      */
-    protected $signature = 'photos:index';
+    protected $signature = 'photos:index {--forced}';
 
     /**
      * The console command description.
@@ -21,8 +23,8 @@ class IndexPhotos extends Command
      * @var string
      */
     protected $description = 'Index photos inside Google Albums';
-
     protected $photoservice;
+    protected $albums;
 
     /**
      * Create a new command instance.
@@ -42,7 +44,51 @@ class IndexPhotos extends Command
      */
     public function handle()
     {
-        $albums = $this->photoservice->albums;
-        dump($albums->listAlbums());
+        $this->albums = Album::get()->keyBy('google_id')->all();
+        $query = $this->performAlbumQuery(['pageSize' => 50]);
+        $this->processQueryResults($query->albums);
+        $moreToCome = $query->nextPageToken;
+        while($moreToCome) {
+            $query = $this->performAlbumQuery(['pageSize' => 50, 'pageToken' => $moreToCome]);
+            $moreToCome = $query->nextPageToken;
+            $this->processQueryResults($query->albums);
+        }
+        $this->comment('Finished album index');
+    }
+
+    protected function processQueryResults($albums)
+    {
+        foreach($albums as $album) {
+            $this->processAlbum($album);
+        }
+    }
+
+    protected function performAlbumQuery($opts)
+    {
+        return $this->photoservice->albums->listAlbums($opts);
+    }
+
+    protected function processAlbum($googleAlbum)
+    {
+        $localAlbum = null;
+        if(!array_key_exists($googleAlbum->id, $this->albums)) {
+            $localAlbum = Album::create([
+                'google_id' => $googleAlbum->id,
+                'title' => $googleAlbum->title,
+            ]);
+            $this->comment('Created album '.$localAlbum->title);
+        } elseif($this->option('forced')) {
+            $localAlbum = $this->albums[$googleAlbum->id];
+            $this->info('Indexing album '.$localAlbum->title);
+        }
+        if(!$localAlbum) {
+            return;
+        }
+        return $this->indexAlbum($localAlbum);
+    }
+
+    protected function indexAlbum(Album $album)
+    {
+        // dump($album);
     }
 }

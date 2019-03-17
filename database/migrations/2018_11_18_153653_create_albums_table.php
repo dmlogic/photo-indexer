@@ -14,10 +14,10 @@ class CreateAlbumsTable extends Migration
     public function up()
     {
         Schema::create('albums', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->increments('id');
             $table->string('google_id')->nullable();
             $table->string('title');
-            $table->datetime('indexed_at')->nullable;
+            $table->datetime('indexed_at')->nullable();
             $table->timestamps();
         });
     }
