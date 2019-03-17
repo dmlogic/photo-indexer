@@ -9,8 +9,7 @@ class Album extends Model
     protected $table = 'albums';
     protected $guarded = [];
 
-
-    public function album()
+    public function photos()
     {
         return $this->hasMany('App\Models\Photo');
     }

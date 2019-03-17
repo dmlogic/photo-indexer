@@ -17,9 +17,7 @@ class CreatePhotosTable extends Migration
             $table->increments('id');
             $table->string('google_id')->nullable();
             $table->unsignedInteger('album_id')->nullable();
-            $table->string('title');
-            $table->text('keywords')->nullable();
-            $table->unsignedInteger('google_album_id')->nullable();
+            $table->string('title')->nullable();;
             $table->timestamps();
         });
     }

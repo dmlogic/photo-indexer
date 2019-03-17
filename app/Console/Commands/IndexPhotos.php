@@ -2,14 +2,20 @@
 
 namespace App\Console\Commands;
 
+use Image;
 use Carbon\Carbon;
 use Google_Client;
 use App\Models\Album;
+use App\Models\Photo;
 use Illuminate\Console\Command;
 use Google_Service_PhotosLibrary;
+use Illuminate\Support\Facades\Storage;
+use Google_Service_PhotosLibrary_SearchMediaItemsRequest;
 
 class IndexPhotos extends Command
 {
+    const MAX_WIDTH = 3840;
+    const MAX_HEIGHT = 2160;
     /**
      * The name and signature of the console command.
      *
@@ -25,6 +31,7 @@ class IndexPhotos extends Command
     protected $description = 'Index photos inside Google Albums';
     protected $photoservice;
     protected $albums;
+    protected $storage;
 
     /**
      * Create a new command instance.
@@ -35,6 +42,7 @@ class IndexPhotos extends Command
     {
         parent::__construct();
         $this->photoservice = new Google_Service_PhotosLibrary($gclient);
+        $this->storage = Storage::disk('photos');
     }
 
     /**
@@ -47,10 +55,10 @@ class IndexPhotos extends Command
         $this->albums = Album::get()->keyBy('google_id')->all();
         $query = $this->performAlbumQuery(['pageSize' => 50]);
         $this->processQueryResults($query->albums);
-        $moreToCome = $query->nextPageToken;
-        while($moreToCome) {
-            $query = $this->performAlbumQuery(['pageSize' => 50, 'pageToken' => $moreToCome]);
-            $moreToCome = $query->nextPageToken;
+        $paginationToken = $query->nextPageToken;
+        while($paginationToken) {
+            $query = $this->performAlbumQuery(['pageSize' => 50, 'pageToken' => $paginationToken]);
+            $paginationToken = $query->nextPageToken;
             $this->processQueryResults($query->albums);
         }
         $this->comment('Finished album index');
@@ -89,11 +97,75 @@ class IndexPhotos extends Command
 
     protected function indexAlbum(Album $album)
     {
-        $alreadyGot = $album->photos()->keyBy('google_id')->get()->toArray();
-        $this->info('already got');
-        dd($aleadyGot);
         // Get any exisiting photo google IDs for this local album
+        $alreadyGot = $album->photos->keyBy('google_id')->all();
         // Get album from API call
-        // Which gives all photo IDs
+        $query = $this->performMediaQuery($album->google_id);
+        $this->info('Media search results');
+        $this->processMediaResults($query->mediaItems,$album->id,$alreadyGot);
+        $paginationToken = $query->nextPageToken;
+        while($paginationToken) {
+            $query = $this->performMediaQuery($album->google_id, $paginationToken);
+            $paginationToken = $query->nextPageToken;
+            $this->processMediaResults($query->mediaItems,$album->id,$alreadyGot);
+        }
+        $album->indexed_at = Carbon::now();
+        $album->save();
+    }
+
+    protected function performMediaQuery($albumId,$token = null)
+    {
+        $request = new Google_Service_PhotosLibrary_SearchMediaItemsRequest;
+        $request->albumId = $albumId;
+        $request->pageSize = 50;
+        if($token) {
+            $request->setPageToken($token);
+        }
+        return $this->photoservice->mediaItems->search($request);
+    }
+
+    protected function processMediaResults($mediaItems,$albumId,$alreadyGot)
+    {
+        foreach($mediaItems as $image) {
+            if(strpos($image->mimeType, 'video') !== false) {
+                continue;
+            }
+            if(!array_key_exists($image->id, $alreadyGot))  {
+                $photo = Photo::create([
+                    'album_id' => $albumId,
+                    'google_id' => $image->id,
+                    'title' => $image->description,
+                    'created_at' => (new Carbon($image->getMediaMetadata()->creationTime))->__toString()
+                ]);
+                $this->comment('Created image '.$image->description);
+            } else {
+                $photo = $alreadyGot[$image->id];
+            }
+            $this->downloadImage($image,$photo);
+        }
+    }
+    /**
+     * https://developers.google.com/photos/library/guides/access-media-items#image-base-urls
+     */
+    protected function downloadImage($mediaItem,$model)
+    {
+        $target = $model->album_id.'/'.$mediaItem->id.'.jpg';
+        if($this->storage->has($target)) {
+            $this->error('Image exists');
+        }
+        $source = $mediaItem->baseUrl.'=w'.self::MAX_WIDTH;
+        $this->storage->put($target, file_get_contents($source));
+        $this->resizeImage($target);
+    }
+
+    protected function resizeImage($source)
+    {
+        $source = storage_path('photos/').$source;
+        $image = Image::make($source);
+        $image->resize(null, self::MAX_HEIGHT, function ($constraint) {
+            $constraint->aspectRatio();
+        });
+        $image->resizeCanvas(self::MAX_WIDTH, self::MAX_HEIGHT, 'center', false, '000000');
+        $image->save($source, 90);
     }
 }
