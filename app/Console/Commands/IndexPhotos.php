@@ -89,6 +89,11 @@ class IndexPhotos extends Command
 
     protected function indexAlbum(Album $album)
     {
-        // dump($album);
+        $alreadyGot = $album->photos()->keyBy('google_id')->get()->toArray();
+        $this->info('already got');
+        dd($aleadyGot);
+        // Get any exisiting photo google IDs for this local album
+        // Get album from API call
+        // Which gives all photo IDs
     }
 }
