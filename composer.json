@@ -1,15 +1,15 @@
 {
-    "name": "dmlogic/google-photos-indexer",
+    "name": "dmlogic/photo-indexer",
     "type": "library",
     "description": "Lookup albums from a Google Photos account and download them to local storage",
     "require": {
         "php": "^7.4|^8.0",
-        "nesbot/carbon": "^2.54",
+        "google/apiclient": "^2.12",
         "google/photos-library": "^1.7",
-        "intervention/image": "^2.7",
-        "laravel/framework": "^8.73"
+        "intervention/image": "^2.7"
     },
     "require-dev": {
+        "laravel/framework": "^9.11",
         "friendsofphp/php-cs-fixer": "^3.3",
         "phpstan/phpstan": "^1.2"
     },

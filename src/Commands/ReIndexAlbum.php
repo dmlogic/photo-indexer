@@ -30,14 +30,13 @@ class ReIndexAlbum extends Command
     /**
      * Create a new command instance.
      *
-     * @return void
      */
-    public function __construct(Google_Client $gclient)
-    {
-        parent::__construct();
-        $this->photoservice = new Google_Service_PhotosLibrary($gclient);
-        $this->storage = Storage::disk('photos');
-    }
+    // public function __construct(Google_Client $gclient)
+    // {
+    //     parent::__construct();
+    //     $this->photoservice = new Google_Service_PhotosLibrary($gclient);
+    //     $this->storage = Storage::disk('photos');
+    // }
 
     /**
      * Execute the console command.

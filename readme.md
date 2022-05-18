@@ -1,6 +1,7 @@
 # Google Photos Indexer
 
 A Laravel package providing console commands to maintain a local copy of a Google Photos account.
+Also has endpoints for setting up OAuth access via a couple of localhost routes.
 
 This can serve as both a backup and, by using the [Slideshow](https://github.com/dmlogic/photo-slideshow) tool, a rolling randomised display on your TV.
 

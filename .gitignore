@@ -2,6 +2,6 @@ composer.lock
 /vendor
 .env
 .phpunit.result.cache
-todo.txt
+todo.md
 credentials.json
-token.json
+indexer
