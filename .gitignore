@@ -1,15 +1,5 @@
-/node_modules
-/public/hot
-/public/storage
-/storage/*.key
-storage/photos
+composer.lock
+/build
 /vendor
 .env
-.phpunit.result.cache
-Homestead.json
-Homestead.yaml
-npm-debug.log
-yarn-error.log
-todo.txt
 credentials.json
-token.json
