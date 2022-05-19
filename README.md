@@ -13,7 +13,7 @@ As a package, this requires a host Laravel app. I _really_ hate dealing with [la
 
 1. Create suitable host hardware and OS. A Raspberry PI with a large storage card is perfect
 2. Clone this repo
-3. Copy .env.template to .env and adjust as required - particularly the full path to photo storage (which should really be totally separate from this code)
+3. Copy `.env.template` to `.env` and adjust as required - particularly the full path to photo storage (which should really be totally separate from this code)
 4. Setup OAuth access to your App and download credentials to `credentials.json` in this folder
 5. Run `./build.sh`
 6. `cd` into `build` and run `php artisan serve`
@@ -29,3 +29,7 @@ You can pretty much follow the above providing you don't trash your data. Recomm
 * Delete the built app
 * Complete the installation steps
 * Copy back `database/database.sqlite` and your photos if necessary
+
+## License
+
+This code is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
