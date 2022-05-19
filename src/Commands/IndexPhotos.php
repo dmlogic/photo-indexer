@@ -1,4 +1,8 @@
 <?php
+/**
+ * This is the main command to index your photos and is intended
+ * to run on a CRON schedule
+ */
 
 namespace DmLogic\GooglePhotoIndex\Commands;
 
