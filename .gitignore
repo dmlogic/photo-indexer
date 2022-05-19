@@ -1,7 +1,5 @@
 composer.lock
+/build
 /vendor
 .env
-.phpunit.result.cache
-todo.md
 credentials.json
-indexer

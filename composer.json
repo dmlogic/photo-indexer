@@ -3,7 +3,7 @@
     "type": "library",
     "description": "Lookup albums from a Google Photos account and download them to local storage",
     "require": {
-        "php": "^7.4|^8.0",
+        "php": "^8.0",
         "google/apiclient": "^2.12",
         "google/photos-library": "^1.7",
         "intervention/image": "^2.7"

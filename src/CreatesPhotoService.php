@@ -1,6 +1,7 @@
 <?php
 /**
- * This was causing all sorts of issues in service providers when the creds were not yet generated.
+ * This was causing all sorts of issues when created via a
+ * service provider if the oauth creds were not yet generated.
  */
 
 namespace DmLogic\GooglePhotoIndex;
@@ -11,7 +12,7 @@ trait CreatesPhotoService
 {
     protected $photoservice;
 
-    public function photoservice()
+    public function photoservice(): PhotosLibraryClient
     {
         if (!$this->photoservice) {
             $this->photoservice = new PhotosLibraryClient(

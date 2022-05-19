@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 set -ex
+mkdir build
+composer create-project --no-install --no-scripts laravel/laravel build
 
-# Run this from the parent dir where you'd like the project to be
-# ./build.sh name-of-project
+cd build
 
-composer create-project --no-install --no-scripts laravel/laravel $1
-
-cd $1
+cp ../.env ./.env
 
 composer config repositories.dmlogic/photo-indexer path ../
 composer install

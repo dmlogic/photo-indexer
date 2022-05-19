@@ -4,12 +4,14 @@ namespace DmLogic\GooglePhotoIndex\Commands;
 
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Google\Photos\Types\MediaItem;
 use Intervention\Image\Facades\Image;
+use Illuminate\Support\Facades\Storage;
 use DmLogic\GooglePhotoIndex\Models\Album;
 use DmLogic\GooglePhotoIndex\Models\Photo;
 use Google\Photos\Types\Album as GoogleAlbum;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use DmLogic\GooglePhotoIndex\CreatesPhotoService;
-use Google_Service_PhotosLibrary_SearchMediaItemsRequest;
 
 class IndexPhotos extends Command
 {
@@ -18,138 +20,108 @@ class IndexPhotos extends Command
     public const MAX_WIDTH = 3840;
     public const MAX_HEIGHT = 2160;
 
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'photos:index {--forced}';
 
-    /**
-     * The console command description.
-     */
-    protected $description = 'Index photos inside Google Albums';
-    protected $albums;
-    protected $storage;
+    protected $description = 'Create local copies of photos inside Google Albums';
+    protected array $localAlbums;
+    protected Filesystem $storage;
 
-    /**
-     * Create a new command instance.
-     *
-     */
     public function __construct()
     {
         parent::__construct();
-        // $this->storage = Storage::disk('photos');
+        $this->storage = Storage::disk('photos');
     }
 
-    /**
-     * Execute the console command.
-     *
-     * @return mixed
-     */
-    public function handle()
+    public function handle(): void
     {
-        $this->albums = Album::get()->keyBy('google_id')->all();
+        $this->localAlbums = Album::get()->keyBy('google_id')->all();
         $pagedResponse = $this->photoservice()->listAlbums(['pageSize' => 50]);
-        $query = $pagedResponse->getIterator();
-        foreach ($query as $googleAlbum) {
+        foreach ($pagedResponse->getIterator() as $googleAlbum) {
             $this->processAlbum($googleAlbum);
         }
         $this->comment('Finished album index');
     }
 
-    protected function processAlbum(GoogleAlbum $googleAlbum)
+    protected function processAlbum(GoogleAlbum $googleAlbum): void
     {
-        $localAlbum = null;
-        if (!array_key_exists($googleAlbum->getId(), $this->albums)) {
-            $localAlbum = Album::create([
+        $albumModel = null;
+        if (!array_key_exists($googleAlbum->getId(), $this->localAlbums)) {
+            $albumModel = Album::create([
                 'google_id' => $googleAlbum->getId(),
                 'title' => $googleAlbum->getTitle(),
             ]);
-            $this->comment('Created album ' . $localAlbum->title);
+            $this->comment('Created album ' . $albumModel->title);
         } elseif ($this->option('forced')) {
-            $localAlbum = $this->albums[$googleAlbum->getId()];
-            $this->info('Indexing album ' . $localAlbum->title);
+            $albumModel = $this->localAlbums[$googleAlbum->getId()];
+            $this->info('Indexing album ' . $albumModel->title);
         }
-        if (!$localAlbum) {
+        if (!$albumModel) {
             return;
         }
-        return $this->indexAlbum($localAlbum);
+        $this->indexAlbum($albumModel);
     }
 
-    protected function indexAlbum(Album $album)
+    protected function indexAlbum(Album $album): void
     {
-        // Get any exisiting photo google IDs for this local album
         $alreadyGot = $album->photos->keyBy('google_id')->all();
-        // Get album from API call
-        $query = $this->performMediaQuery($album->google_id);
-        $this->info('Media search results');
-        $this->processMediaResults($query->mediaItems, $album->id, $alreadyGot);
-        $paginationToken = $query->nextPageToken;
-        while ($paginationToken) {
-            $query = $this->performMediaQuery($album->google_id, $paginationToken);
-            $paginationToken = $query->nextPageToken;
-            $this->processMediaResults($query->mediaItems, $album->id, $alreadyGot);
+        $response = $this->photoservice()->searchMediaItems(['albumId' => $album->google_id, 'pageSize' => 50]);
+        foreach ($response->iterateAllElements() as $item) {
+            // @see https://developers.google.com/photos/library/guides/list#listing-album-contents
+            $this->processMediaItem($item, $album->id, $alreadyGot);
         }
         $album->indexed_at = Carbon::now();
         $album->save();
-        dd('indexed album');
     }
 
-    protected function performMediaQuery($albumId, $token = null)
+    protected function processMediaItem(MediaItem $mediaItem, string $albumId, array $alreadyGot): void
     {
-        $request = new Google_Service_PhotosLibrary_SearchMediaItemsRequest;
-        $request->albumId = $albumId;
-        $request->pageSize = 50;
-        if ($token) {
-            $request->setPageToken($token);
+        if (strpos($mediaItem->getMimeType(), 'video') !== false) {
+            $this->comment('Skip video ' . $mediaItem->getDescription());
+            return;
         }
-        return $this->photoservice->mediaItems->search($request);
-    }
-
-    protected function processMediaResults($mediaItems, $albumId, $alreadyGot)
-    {
-        foreach ($mediaItems as $image) {
-            if (strpos($image->mimeType, 'video') !== false) {
-                continue;
-            }
-            if (!array_key_exists($image->id, $alreadyGot)) {
-                $photo = Photo::create([
-                    'album_id' => $albumId,
-                    'google_id' => $image->id,
-                    'title' => $image->description,
-                    'created_at' => (new Carbon($image->getMediaMetadata()->creationTime))->__toString(),
-                ]);
-                $this->comment('Created image ' . $image->description);
-            } else {
-                $photo = $alreadyGot[$image->id];
-            }
-            $this->downloadImage($image, $photo);
+        if (!array_key_exists($mediaItem->getId(), $alreadyGot)) {
+            $photo = Photo::create([
+                'album_id' => $albumId,
+                'google_id' => $mediaItem->getId(),
+                'title' => $mediaItem->getDescription(),
+                'created_at' => Carbon::createFromTimestamp(
+                    $mediaItem->getMediaMetadata()->getCreationTime()->getSeconds()
+                ),
+            ]);
+            $this->comment('Created image ' . $mediaItem->getDescription());
+        } else {
+            $photo = $alreadyGot[$mediaItem->getId()];
         }
+        $this->downloadImage($mediaItem, $photo);
     }
 
     /**
-     * https://developers.google.com/photos/library/guides/access-media-items#image-base-urls
+     * @see https://developers.google.com/photos/library/guides/access-media-items#image-base-urls
      */
-    protected function downloadImage($mediaItem, $model)
+    protected function downloadImage(MediaItem $mediaItem, Photo $model): void
     {
-        $target = $model->album_id . '/' . $mediaItem->id . '.jpg';
+        $target = $model->album_id . '/' . $mediaItem->getId() . '.jpg';
         if ($this->storage->has($target)) {
             $this->error('Image exists');
+            return;
         }
-        $source = $mediaItem->baseUrl . '=w' . self::MAX_WIDTH;
+        $source = $mediaItem->getBaseUrl() . '=w' . self::MAX_WIDTH;
         $this->storage->put($target, file_get_contents($source));
         $this->resizeImage($target);
     }
 
-    protected function resizeImage($source)
+    /**
+     * Resizes our downloaded image so it will fit
+     * nicely in our photo frame app
+     */
+    protected function resizeImage(string $pathToImage): void
     {
-        $source = storage_path('photos/') . $source;
-        $image = Image::make($source);
+        $pathToImage = '/' . trim(config('photos.storage_path'), '/') . '/' . $pathToImage;
+        $image = Image::make($pathToImage);
         $image->resize(null, self::MAX_HEIGHT, function ($constraint) {
             $constraint->aspectRatio();
         });
         $image->resizeCanvas(self::MAX_WIDTH, self::MAX_HEIGHT, 'center', false, '000000');
-        $image->save($source, 90);
+        $image->save($pathToImage, 90);
     }
 }

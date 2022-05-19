@@ -20,34 +20,40 @@ class GoogleOAuth
 
     public function __construct()
     {
+        $this->createGoogleClient(config('photos.oauth'), $this->authScopes, route('oauth.handle'));
+    }
+
+    public function createGoogleClient($config, $scopes, $redirectRoute): void
+    {
         $this->oauthClient = new Client;
-        $this->oauthClient->setAuthConfig(config('oauth'));
-        $this->oauthClient->addScope($this->authScopes);
-        $this->oauthClient->setRedirectUri(route('oauth.handle'));
+        $this->oauthClient->setAuthConfig($config);
+        $this->oauthClient->addScope($scopes);
+        $this->oauthClient->setRedirectUri($redirectRoute);
         $this->oauthClient->setAccessType('offline');
         $this->oauthClient->setApprovalPrompt('force');
     }
 
-    public function getAuthenticationUrl()
+    public function getAuthenticationUrl(): string
     {
         return $this->oauthClient->createAuthUrl();
     }
 
-    public function getCredentials()
+    /**
+     * The OAuth procedure must have been completed before this will work
+     * @throws RuntimeException
+     */
+    public function getCredentials(): UserRefreshCredentials
     {
         if (!$accessToken = Storage::disk('local')->get('oauth.access')) {
             throw new RuntimeException('No access token found');
         }
         $this->oauthClient->setAccessToken($accessToken);
-        // if ($this->oauthClient->isAccessTokenExpired()) {
-        //     return $this->oauthClient->fetchAccessTokenWithRefreshToken($this->oauthClient->getRefreshToken());
-        // }
-        // // return $this->oauthClient->getAccessToken();
+
         return new UserRefreshCredentials(
             $this->authScopes,
             [
-                'client_id' => config('oauth.client_id'),
-                'client_secret' => config('oauth.client_secret'),
+                'client_id' => config('photos.oauth.client_id'),
+                'client_secret' => config('photos.oauth.client_secret'),
                 'refresh_token' => $this->oauthClient->getRefreshToken(),
             ]
         );

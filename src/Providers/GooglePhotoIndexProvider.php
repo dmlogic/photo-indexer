@@ -22,24 +22,52 @@ class GooglePhotoIndexProvider extends ServiceProvider
      */
     public function boot()
     {
-        // Commands
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                IndexPhotos::class,
-                ReIndexAlbum::class,
-            ]);
+        $this->registerCommands();
+        $this->registerRoutes();
+        $this->setConfigValues();
+        $this->registerMigrations();
+    }
+
+    private function registerCommands(): void
+    {
+        if (!$this->app->runningInConsole()) {
+            return;
         }
+        $this->commands([
+            IndexPhotos::class,
+            ReIndexAlbum::class,
+        ]);
+    }
 
-        // Routes
+    private function registerRoutes(): void
+    {
         $this->loadRoutesFrom(__DIR__ . '/../Http/routes.php');
+    }
 
-        // Config
+    private function setConfigValues(): void
+    {
+        // Allows values to be picked up from .env
+        $this->mergeConfigFrom(
+            __DIR__ . '/../config/photos.php',
+            'photos'
+        );
+
+        // Parse in the oauth creds to the config array
         $creds = json_decode(file_get_contents(__DIR__ . '/../../credentials.json'), true);
-        config(['oauth' => $creds['web']]);
-        config(['database.default' => 'sqlite']);
-        config(['database.connections.sqlite.database' => database_path('database.sqlite')]);
+        config(['photos.oauth' => $creds['web']]);
 
-        // Migrations
-        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
+        // Create a new storage location based on the path we set at build
+        config(['filesystems.disks.photos' => [
+            'driver' => 'local',
+            'root' => config('photos.storage_path'),
+        ]]);
+
+        // Ensure we have a full path to our sqlite database
+        config(['database.connections.sqlite.database' => database_path('database.sqlite')]);
+    }
+
+    private function registerMigrations(): void
+    {
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
     }
 }
