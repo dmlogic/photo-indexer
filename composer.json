@@ -2,6 +2,8 @@
     "name": "dmlogic/photo-indexer",
     "type": "library",
     "description": "Lookup albums from a Google Photos account and download them to local storage",
+    "keywords": ["laravel", "google photos"],
+    "license": "MIT",
     "require": {
         "php": "^8.0",
         "google/apiclient": "^2.12",
