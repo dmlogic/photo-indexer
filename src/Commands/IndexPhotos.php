@@ -48,6 +48,9 @@ class IndexPhotos extends Command
 
     protected function processAlbum(GoogleAlbum $googleAlbum): void
     {
+        if ($this->shouldSkipAlbum($googleAlbum)) {
+            return;
+        }
         $albumModel = null;
         if (!array_key_exists($googleAlbum->getId(), $this->localAlbums)) {
             $albumModel = Album::create([
@@ -63,6 +66,11 @@ class IndexPhotos extends Command
             return;
         }
         $this->indexAlbum($albumModel);
+    }
+
+    private function shouldSkipAlbum(GoogleAlbum $googleAlbum)
+    {
+        return substr($googleAlbum->getTitle(), 0, 1) === '_';
     }
 
     protected function indexAlbum(Album $album): void
