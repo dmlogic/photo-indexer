@@ -27,6 +27,7 @@ You can pretty much follow the above providing you don't trash your data. Recomm
 * Copy `database/database.sqlite` somewhere safe
 * If your photo storage is not outside of the built app, copy it somewhere safe
 * Delete the built app
+* Update the package files to the latest version
 * Complete the installation steps
 * Copy back `database/database.sqlite` and your photos if necessary
 

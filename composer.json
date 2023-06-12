@@ -11,7 +11,7 @@
         "intervention/image": "^2.7"
     },
     "require-dev": {
-        "laravel/framework": "^9.11",
+        "laravel/framework": "^10",
         "friendsofphp/php-cs-fixer": "^3.3",
         "phpstan/phpstan": "^1.2"
     },

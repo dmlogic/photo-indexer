@@ -8,6 +8,7 @@ cd build
 cp ../.env ./.env
 
 composer config repositories.dmlogic/photo-indexer path ../
+composer config minimum-stability dev
 composer install
 composer require dmlogic/photo-indexer
 composer run-script post-root-package-install
